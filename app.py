@@ -34,7 +34,6 @@ try:
         row_cells_lower = [str(x).strip().lower() for x in raw_data[i]]
         if 'кассир' in row_cells_lower or 'литейщик' in row_cells_lower:
             locations_row = raw_data[i].copy()
-        # Ищем сокращения Я, М, Ф
         if 'я' in row_cells_lower or 'м' in row_cells_lower or 'ф' in row_cells_lower or 'яга' in row_cells_lower:
             types_row = raw_data[i].copy()
             data_start_idx = i + 1
@@ -43,7 +42,7 @@ try:
         st.error("Не удалось найти шапку таблицы. Проверьте, есть ли позывной 'Кассир' и типы 'Я', 'М', 'Ф'.")
         st.stop()
 
-    # --- 2. РАСПРЕДЕЛЯЕМ ПОЗЫВНЫЕ (Заполняем объединенные ячейки) ---
+    # --- 2. РАСПРЕДЕЛЯЕМ ПОЗЫВНЫЕ ---
     current_loc = "Неизвестно"
     for i in range(len(locations_row)):
         val = str(locations_row[i]).strip()
@@ -68,12 +67,11 @@ try:
             loc = locations_row[col_idx]
             typ_raw = str(types_row[col_idx]).strip().lower()
             
-            # Распознаем новые сокращения из таблицы
             if typ_raw in ['я', 'яга']: typ = 'Яга'
             elif typ_raw in ['м', 'мавик']: typ = 'Мавик'
             elif typ_raw in ['ф', 'фпв']: typ = 'ФПВ'
             elif typ_raw in ['к', 'крыло']: typ = 'Крыло'
-            else: continue # Пропускаем столбцы без типов (например, "Итого")
+            else: continue 
 
             val = str(row[col_idx]).strip()
             if val.lower() not in ['nan', 'none', '', '[пусто]']:
@@ -96,7 +94,6 @@ try:
         
         plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 
-        # Собираем список позывных строго по порядку из шапки таблицы
         locations_list = []
         for loc in locations_row:
             if loc not in locations_list and loc.lower() not in ['nan', 'none', 'неизвестно', 'точка', 'итого', 'время']:
@@ -104,7 +101,6 @@ try:
                 
         y_map = {loc: i for i, loc in enumerate(locations_list)}
         
-        # Назначаем отступы и цвета
         y_offsets = {'Яга': -0.2, 'Мавик': 0.0, 'ФПВ': 0.2, 'Крыло': 0.4}
         colors = {'Яга': 'red', 'Мавик': 'blue', 'ФПВ': 'green', 'Крыло': 'purple'}
 
@@ -138,12 +134,14 @@ try:
 
         ax.set_yticks(range(len(locations_list)))
         ax.set_yticklabels(locations_list)
-        ax.invert_yaxis() # Переворачиваем, чтобы Кассир был на самом верху
+        ax.invert_yaxis() 
 
         plt.title(f'Активность БПЛА ({selected_date})', fontsize=16, fontweight='bold')
         plt.xlabel('Временной промежуток', fontsize=12)
         plt.ylabel('Позывной (Точка)', fontsize=12)
-        plt.xticks(rotation=45)
+        
+        # === ИЗМЕНЕНИЕ: Сделали текст времени строго вертикальным ===
+        plt.xticks(rotation=90)
 
         handles, labels = ax.get_legend_handles_labels()
         plt.legend(handles, labels, title='Тип БПЛА', bbox_to_anchor=(1.01, 1), loc='upper left')
