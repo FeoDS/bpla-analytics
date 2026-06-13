@@ -1,39 +1,24 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import urllib.request
-import io
 
 st.set_page_config(page_title="Дашборд БПЛА", layout="wide")
 st.title("Аналитика: Активность БПЛА")
 
-# === ВАША ССЫЛКА НА GOOGLE ТАБЛИЦУ ===
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1NalpEtGmb35l1lpPhb1B-oHtk6d71Inoejj5aw8L9fM/edit?usp=sharing"
+# === ВАША ПРЯМАЯ ССЫЛКА НА ФАЙЛ ===
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQxlFWLhaIGhsejpUGsL78e29h0eCWjcABwtuHqzzPWr6iA_tQxni3V7tzuPFNkaXUj15xWUlFSsngJ/pub?output=xlsx"
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60) # Сайт проверяет обновления раз в 60 секунд
 def load_data(url):
-    if "/edit" in url:
-        export_url = url.split('/edit')[0] + '/export?format=xlsx'
-    else:
-        export_url = url
-    
-    # Маскируемся под обычный браузер, чтобы Google не блокировал скачивание
-    req = urllib.request.Request(
-        export_url, 
-        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    )
-    
-    with urllib.request.urlopen(req) as response:
-        file_bytes = response.read()
-        
-    return pd.ExcelFile(io.BytesIO(file_bytes))
+    # Качаем файл напрямую, без сложных обходных путей
+    return pd.ExcelFile(url)
 
 try:
     # 1. Загружаем данные
     xls = load_data(GOOGLE_SHEET_URL)
     sheet_names = xls.sheet_names
     
-    # 2. Выбор вкладки
+    # 2. Выбор вкладки (даты)
     selected_date = st.selectbox("📅 Выберите вкладку (дату):", sheet_names)
     
     # 3. Читаем лист
@@ -135,7 +120,5 @@ try:
 
         st.pyplot(fig)
 
-except urllib.error.HTTPError as e:
-    st.error(f"Google всё ещё блокирует доступ (Ошибка {e.code}). Убедитесь, что в настройках доступа таблицы выбрано «Все, у кого есть ссылка», а не доступ только для сотрудников вашей организации.")
 except Exception as e:
     st.error(f"Произошла ошибка при загрузке таблицы: {e}")
