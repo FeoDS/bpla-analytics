@@ -8,18 +8,14 @@ st.title("Аналитика: Активность БПЛА")
 # === ВАША ССЫЛКА НА GOOGLE ТАБЛИЦУ ===
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1gFjEc-wc7a3SHn3pK2cEm9m0gihAz93G/edit?usp=sharing&ouid=105336077872687698779&rtpof=true&sd=true"
 
-@st.cache_data(ttl=60) # Сайт будет проверять новые данные раз в 60 секунд
+@st.cache_data(ttl=60) # Сайт проверяет обновления раз в 60 секунд
 def load_data(url):
-    # Код сам превращает обычную ссылку в ссылку для выгрузки
+    # Умный конвертер ссылки для скачивания данных
     if "/edit" in url:
         export_url = url.split('/edit')[0] + '/export?format=xlsx'
     else:
         export_url = url
     return pd.ExcelFile(export_url)
-
-if GOOGLE_SHEET_URL == "СЮДА_ВСТАВИТЬ_ССЫЛКУ_НА_ГУГЛ_ТАБЛИЦУ":
-    st.warning("Пожалуйста, вставьте ссылку на вашу таблицу в код файла app.py")
-    st.stop()
 
 try:
     # 1. Загружаем данные по ссылке
@@ -37,7 +33,7 @@ try:
         st.warning("На этой вкладке пока нет данных.")
         st.stop()
 
-    # --- Наш проверенный алгоритм парсинга ---
+    # --- Наш алгоритм поиска и сбора цифр ---
     locations_row = raw_data[1]
     types_row = raw_data[2]
 
