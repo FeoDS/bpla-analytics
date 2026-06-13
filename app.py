@@ -25,34 +25,32 @@ try:
         st.warning("На этой вкладке пока нет данных.")
         st.stop()
 
-    # --- УМНЫЙ ПОИСК СТРОК (Защита от смещения таблицы) ---
+    # --- УМНЫЙ ПОИСК СТРОК С ПОЗЫВНЫМИ И ТИПАМИ ---
     locations_row = None
     types_row = None
     data_start_idx = 0
 
-    for i in range(min(10, len(raw_data))):
-        # Переводим в нижний регистр для точного поиска
+    for i in range(min(15, len(raw_data))):
         row_cells = [str(x).strip().lower() for x in raw_data[i]]
-        if 'точка' in row_cells or 'кассир' in row_cells:
+        if 'кассир' in row_cells or 'литейщик' in row_cells:
             locations_row = raw_data[i]
-        elif 'тип бпла' in row_cells or 'яга' in row_cells:
+        elif 'яга' in row_cells or 'мавик' in row_cells or 'фпв' in row_cells:
             types_row = raw_data[i]
             data_start_idx = i + 1
 
     if locations_row is None or types_row is None:
-        st.error("Не удалось определить заголовки 'Точка' или 'Тип БПЛА'. Проверьте структуру таблицы.")
+        st.error("Не удалось найти строки с позывными ('Кассир') или типами ('Яга'). Проверьте таблицу.")
         st.stop()
 
-    # --- Сбор позывных ---
+    # --- СБОР ПОЗЫВНЫХ (Начинаем со столбца D / индекс 3) ---
     current_loc = "Неизвестно"
-    # Начинаем с индекса 2 (столбец C)
-    for i in range(2, len(locations_row)):
+    for i in range(3, len(locations_row)):
         val = str(locations_row[i]).strip()
-        if val not in ['nan', 'None', '', '[ПУСТО]']:
+        if val not in ['nan', 'None', '', '[ПУСТО]', 'Точка']:
             current_loc = val
         locations_row[i] = current_loc
 
-    # --- Парсинг цифр ---
+    # --- ПАРСИНГ ЦИФР ---
     parsed_data = []
     for row_idx in range(data_start_idx, len(raw_data)):
         row = raw_data[row_idx]
@@ -61,7 +59,7 @@ try:
         if time_val in ['nan', 'None', '', '[ПУСТО]']:
             continue
 
-        for col_idx in range(2, len(row)):
+        for col_idx in range(3, len(row)): # Собираем данные только под позывными
             if col_idx >= len(locations_row) or col_idx >= len(types_row):
                 continue
                 
@@ -72,18 +70,17 @@ try:
             if val not in ['nan', 'None', '', '[ПУСТО]']:
                 clean_val = ''.join(filter(str.isdigit, val))
                 if clean_val:
-                    qty = int(clean_val)
-                    if qty > 0:
-                        parsed_data.append({
-                            'Время': time_val,
-                            'Место': loc,
-                            'Тип': typ,
-                            'Количество': qty
-                        })
+                    parsed_data.append({
+                        'Время': time_val,
+                        'Место': loc,
+                        'Тип': typ,
+                        'Количество': int(clean_val)
+                    })
 
-    df_cleaned = pd.DataFrame(parsed_data)
+    # Жестко задаем структуру таблицы, чтобы исключить KeyError
+    df_cleaned = pd.DataFrame(parsed_data, columns=['Время', 'Место', 'Тип', 'Количество'])
 
-    # --- Отрисовка графика ---
+    # --- ОТРИСОВКА ГРАФИКА ---
     if len(df_cleaned) == 0:
         st.info("В выбранный день активность не зафиксирована.")
     else:
@@ -91,21 +88,18 @@ try:
         
         plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 
-        # Вытаскиваем все уникальные позывные прямо из шапки, чтобы они отображались всегда
+        # Вытаскиваем позывные для оси Y строго из шапки таблицы
         locations_list = []
-        for loc in locations_row[2:]:
-            clean_loc = str(loc).strip()
-            if clean_loc not in locations_list and clean_loc not in ['nan', 'None', '', '[ПУСТО]']:
-                locations_list.append(clean_loc)
+        for loc in locations_row[3:]:
+            if loc not in locations_list and loc not in ['nan', 'None', '', '[ПУСТО]', 'Точка', 'Неизвестно']:
+                locations_list.append(loc)
                 
         types_list = df_cleaned['Тип'].unique().tolist()
-
         y_map = {loc: i for i, loc in enumerate(locations_list)}
         
         y_offsets = {'Яга': -0.3, 'Мавик': -0.1, 'ФПВ': 0.1, 'Крыло': 0.3}
         colors = {'Яга': 'red', 'Мавик': 'blue', 'ФПВ': 'green', 'Крыло': 'purple'}
 
-        # Высота графика подстраивается под количество точек
         fig, ax = plt.subplots(figsize=(14, max(8, len(locations_list) * 0.8)))
 
         for t in types_list:
@@ -115,22 +109,29 @@ try:
             offset = y_offsets.get(t, 0.0)
             color = colors.get(t, 'gray')
             
-            y_pos = [y_map[loc] + offset for loc in subset['Место']]
+            y_pos = []
+            for loc in subset['Место']:
+                if loc in y_map:
+                    y_pos.append(y_map[loc] + offset)
+                else:
+                    y_pos.append(0) # Защита от сбоев
             
             ax.scatter(subset['Время'], y_pos, 
                        s=subset['Количество'] * 200, 
                        c=color, label=t, alpha=0.6, edgecolors='black')
             
             for idx, r in subset.iterrows():
-                y_coord = y_map[r['Место']] + offset
-                ax.annotate(str(r['Количество']), 
-                            (r['Время'], y_coord),
-                            ha='center', va='center', 
-                            fontsize=10, fontweight='bold', color='black')
+                loc = r['Место']
+                if loc in y_map:
+                    y_coord = y_map[loc] + offset
+                    ax.annotate(str(r['Количество']), 
+                                (r['Время'], y_coord),
+                                ha='center', va='center', 
+                                fontsize=10, fontweight='bold', color='black')
 
         ax.set_yticks(range(len(locations_list)))
         ax.set_yticklabels(locations_list)
-        ax.invert_yaxis() # Переворачиваем ось Y (Кассир сверху)
+        ax.invert_yaxis() # Разворачиваем ось (Кассир будет сверху)
 
         plt.title(f'Активность БПЛА ({selected_date})', fontsize=16, fontweight='bold')
         plt.xlabel('Временной промежуток', fontsize=12)
