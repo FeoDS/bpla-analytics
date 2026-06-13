@@ -8,9 +8,9 @@ st.title("Аналитика: Активность БПЛА")
 # === ВАША ПРЯМАЯ ССЫЛКА НА ФАЙЛ ===
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQxlFWLhaIGhsejpUGsL78e29h0eCWjcABwtuHqzzPWr6iA_tQxni3V7tzuPFNkaXUj15xWUlFSsngJ/pub?output=xlsx"
 
-@st.cache_data(ttl=60) # Сайт проверяет обновления раз в 60 секунд
+# ИЗМЕНЕНИЕ: Заменили cache_data на cache_resource для работы с файлами
+@st.cache_resource(ttl=60) 
 def load_data(url):
-    # Качаем файл напрямую, без сложных обходных путей
     return pd.ExcelFile(url)
 
 try:
