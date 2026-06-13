@@ -5,11 +5,10 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Дашборд БПЛА", layout="wide")
 st.title("Аналитика: Активность БПЛА")
 
-# === ВАША ПРЯМАЯ ССЫЛКА НА ФАЙЛ ===
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQxlFWLhaIGhsejpUGsL78e29h0eCWjcABwtuHqzzPWr6iA_tQxni3V7tzuPFNkaXUj15xWUlFSsngJ/pub?output=xlsx"
+# === ВАША ИДЕАЛЬНАЯ ССЫЛКА ===
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSI_V0g8qbn-UGALj94aDW3jYFjFvVch7PIklv54n33RsVR9P3mvXGLZBRC-Vi_CEsskTMIdTbsF7Iu/pub?output=xlsx"
 
-# ИЗМЕНЕНИЕ: Заменили cache_data на cache_resource для работы с файлами
-@st.cache_resource(ttl=60) 
+@st.cache_resource(ttl=60)
 def load_data(url):
     return pd.ExcelFile(url)
 
@@ -25,15 +24,18 @@ try:
     df = pd.read_excel(xls, sheet_name=selected_date, header=None)
     raw_data = df.values.tolist()
 
-    if len(raw_data) < 3:
+    if len(raw_data) < 4:
         st.warning("На этой вкладке пока нет данных.")
         st.stop()
 
-    # --- Парсинг данных ---
+    # --- Парсинг данных под новую структуру ---
+    # Строка 2 (индекс 1) - Позывные
     locations_row = raw_data[1]
+    # Строка 3 (индекс 2) - Типы БПЛА
     types_row = raw_data[2]
 
     current_loc = "Неизвестно"
+    # Начинаем со столбца C (индекс 2), чтобы пропустить столбец "Итого"
     for i in range(2, len(locations_row)):
         val = str(locations_row[i]).strip()
         if val not in ['nan', 'None', '', '[ПУСТО]']:
@@ -41,6 +43,7 @@ try:
         locations_row[i] = current_loc
 
     parsed_data = []
+    # Данные начинаются со строки 4 (индекс 3)
     for row_idx in range(3, len(raw_data)):
         row = raw_data[row_idx]
         time_val = str(row[0]).strip()
@@ -49,6 +52,10 @@ try:
             continue
 
         for col_idx in range(2, len(row)):
+            # Защита от пустых колонок на краях таблицы
+            if col_idx >= len(locations_row) or col_idx >= len(types_row):
+                continue
+                
             loc = locations_row[col_idx]
             typ = str(types_row[col_idx]).strip()
             val = str(row[col_idx]).strip()
@@ -79,8 +86,10 @@ try:
         types_list = df_cleaned['Тип'].unique().tolist()
 
         y_map = {loc: i for i, loc in enumerate(locations_list)}
-        y_offsets = {'Яга': -0.2, 'Мавик': 0.0, 'ФПВ': 0.2}
-        colors = {'Яга': 'red', 'Мавик': 'blue', 'ФПВ': 'green'}
+        
+        # 4 типа БПЛА распределены по вертикали
+        y_offsets = {'Яга': -0.3, 'Мавик': -0.1, 'ФПВ': 0.1, 'Крыло': 0.3}
+        colors = {'Яга': 'red', 'Мавик': 'blue', 'ФПВ': 'green', 'Крыло': 'purple'}
 
         fig, ax = plt.subplots(figsize=(14, 8))
 
