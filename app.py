@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Дашборд БПЛА", layout="wide")
 st.title("Аналитика: Активность БПЛА")
 
-# === ВАША ИДЕАЛЬНАЯ ССЫЛКА ===
+# === ВАША ПРЯМАЯ ССЫЛКА НА ФАЙЛ ===
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSI_V0g8qbn-UGALj94aDW3jYFjFvVch7PIklv54n33RsVR9P3mvXGLZBRC-Vi_CEsskTMIdTbsF7Iu/pub?output=xlsx"
 
 @st.cache_resource(ttl=60)
@@ -13,14 +13,11 @@ def load_data(url):
     return pd.ExcelFile(url)
 
 try:
-    # 1. Загружаем данные
     xls = load_data(GOOGLE_SHEET_URL)
     sheet_names = xls.sheet_names
     
-    # 2. Выбор вкладки (даты)
     selected_date = st.selectbox("📅 Выберите вкладку (дату):", sheet_names)
     
-    # 3. Читаем лист
     df = pd.read_excel(xls, sheet_name=selected_date, header=None)
     raw_data = df.values.tolist()
 
@@ -28,23 +25,36 @@ try:
         st.warning("На этой вкладке пока нет данных.")
         st.stop()
 
-    # --- Парсинг данных под новую структуру ---
-    # Строка 2 (индекс 1) - Позывные
-    locations_row = raw_data[1]
-    # Строка 3 (индекс 2) - Типы БПЛА
-    types_row = raw_data[2]
+    # --- УМНЫЙ ПОИСК СТРОК (Защита от смещения таблицы) ---
+    locations_row = None
+    types_row = None
+    data_start_idx = 0
 
+    for i in range(min(10, len(raw_data))):
+        # Переводим в нижний регистр для точного поиска
+        row_cells = [str(x).strip().lower() for x in raw_data[i]]
+        if 'точка' in row_cells or 'кассир' in row_cells:
+            locations_row = raw_data[i]
+        elif 'тип бпла' in row_cells or 'яга' in row_cells:
+            types_row = raw_data[i]
+            data_start_idx = i + 1
+
+    if locations_row is None or types_row is None:
+        st.error("Не удалось определить заголовки 'Точка' или 'Тип БПЛА'. Проверьте структуру таблицы.")
+        st.stop()
+
+    # --- Сбор позывных ---
     current_loc = "Неизвестно"
-    # Начинаем со столбца C (индекс 2), чтобы пропустить столбец "Итого"
+    # Начинаем с индекса 2 (столбец C)
     for i in range(2, len(locations_row)):
         val = str(locations_row[i]).strip()
         if val not in ['nan', 'None', '', '[ПУСТО]']:
             current_loc = val
         locations_row[i] = current_loc
 
+    # --- Парсинг цифр ---
     parsed_data = []
-    # Данные начинаются со строки 4 (индекс 3)
-    for row_idx in range(3, len(raw_data)):
+    for row_idx in range(data_start_idx, len(raw_data)):
         row = raw_data[row_idx]
         time_val = str(row[0]).strip()
         
@@ -52,7 +62,6 @@ try:
             continue
 
         for col_idx in range(2, len(row)):
-            # Защита от пустых колонок на краях таблицы
             if col_idx >= len(locations_row) or col_idx >= len(types_row):
                 continue
                 
@@ -82,16 +91,22 @@ try:
         
         plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'Arial']
 
-        locations_list = df_cleaned['Место'].unique().tolist()
+        # Вытаскиваем все уникальные позывные прямо из шапки, чтобы они отображались всегда
+        locations_list = []
+        for loc in locations_row[2:]:
+            clean_loc = str(loc).strip()
+            if clean_loc not in locations_list and clean_loc not in ['nan', 'None', '', '[ПУСТО]']:
+                locations_list.append(clean_loc)
+                
         types_list = df_cleaned['Тип'].unique().tolist()
 
         y_map = {loc: i for i, loc in enumerate(locations_list)}
         
-        # 4 типа БПЛА распределены по вертикали
         y_offsets = {'Яга': -0.3, 'Мавик': -0.1, 'ФПВ': 0.1, 'Крыло': 0.3}
         colors = {'Яга': 'red', 'Мавик': 'blue', 'ФПВ': 'green', 'Крыло': 'purple'}
 
-        fig, ax = plt.subplots(figsize=(14, 8))
+        # Высота графика подстраивается под количество точек
+        fig, ax = plt.subplots(figsize=(14, max(8, len(locations_list) * 0.8)))
 
         for t in types_list:
             subset = df_cleaned[df_cleaned['Тип'] == t]
@@ -115,14 +130,15 @@ try:
 
         ax.set_yticks(range(len(locations_list)))
         ax.set_yticklabels(locations_list)
+        ax.invert_yaxis() # Переворачиваем ось Y (Кассир сверху)
 
         plt.title(f'Активность БПЛА ({selected_date})', fontsize=16, fontweight='bold')
         plt.xlabel('Временной промежуток', fontsize=12)
-        plt.ylabel('Позиция', fontsize=12)
+        plt.ylabel('Позывной (Точка)', fontsize=12)
         plt.xticks(rotation=45)
 
         handles, labels = ax.get_legend_handles_labels()
-        plt.legend(handles, labels, title='Тип', bbox_to_anchor=(1.01, 1), loc='upper left')
+        plt.legend(handles, labels, title='Тип БПЛА', bbox_to_anchor=(1.01, 1), loc='upper left')
 
         plt.grid(axis='both', linestyle='--', alpha=0.5)
         plt.tight_layout()
