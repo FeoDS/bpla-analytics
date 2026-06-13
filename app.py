@@ -6,7 +6,7 @@ st.set_page_config(page_title="Дашборд БПЛА", layout="wide")
 st.title("Аналитика: Активность БПЛА")
 
 # === ВАША ССЫЛКА НА GOOGLE ТАБЛИЦУ ===
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1gFjEc-wc7a3SHn3pK2cEm9m0gihAz93G/edit?usp=sharing&ouid=105336077872687698779&rtpof=true&sd=true"
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1NalpEtGmb35l1lpPhb1B-oHtk6d71Inoejj5aw8L9fM/edit?usp=sharing"
 
 @st.cache_data(ttl=60) # Сайт проверяет обновления раз в 60 секунд
 def load_data(url):
